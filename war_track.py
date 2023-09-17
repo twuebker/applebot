@@ -4,6 +4,10 @@ import coc
 async def print_war(tag):
     async with coc.Client() as coc_client:
         try:
+          await coc.login("email", "password")
+        except coc.InvalidCredentials as error:
+            exit(error)
+        try:
             war = await coc_client.get_current_war(tag)
             return f"{war.clan_tag} is currently in {war.state} state."
         except coc.privatewarlog:
