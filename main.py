@@ -1,6 +1,7 @@
 import os
 import discord
 import requests
+from dotenv import load_dotenv
 import json
 from discord import Embed
 
@@ -9,37 +10,33 @@ intents.message_content = True
 client = discord.Client(intents=intents)
 api_url = "https://libretranslate.eownerdead.dedyn.io/translate"
 emoji_flag_to_country_code = {
-    "🇩🇪": "de",  # German flag
-    "🇺🇸": "en",  # United States flag
-    "🇬🇧": "en",  # United Kingdom flag
-    "🇫🇷": "fr",  # French flag
-    "🇮🇹": "it",  # Italian flag
-    "🇨🇳": "cn",  # China
-    "🇮🇳": "in",  # India
-    "🇮🇩": "id",  # Indonesia
-    "🇵🇰": "pk",  # Pakistan
-    "🇧🇷": "br",  # Brazil
-    "🇳🇬": "ng",  # Nigeria
-    "🇧🇩": "bd",  # Bangladesh
-    "🇷🇺": "ru",  # Russia
-    "🇯🇵": "jp",  # Japan
-    "🇲🇽": "mx",  # Mexico
-    "🇵🇭": "ph",  # Philippines
-    "🇪🇬": "eg",  # Egypt
-    "🇪🇹": "et",  # Ethiopia
-    "🇻🇳": "vn",  # Vietnam
-    "🇨🇩": "cd",  # Democratic Republic of the Congo
-    "🇹🇷": "tr",  # Turkey
-    "🇮🇷": "ir",  # Iran
-    "🇹🇭": "th",  # Thailand
+    "🇩🇪": "de",
+    "🇺🇸": "en",
+    "🇬🇧": "en",
+    "🇫🇷": "fr",
+    "🇮🇹": "it",
+    "🇨🇳": "zh",
+    "🇮🇳": "hi",
+    "🇧🇷": "br",
+    "🇷🇺": "ru",
+    "🇯🇵": "ja",
+    "🇫🇮": "fi",
+    "🇸🇪": "sv",
+    "🇳🇱": "nl",
+    "🇬🇷": "el",
+    "🇳🇴": "nb",
+    "🇰🇷" : "ko",
+    "🇵🇱" : "pl"
 }
+country_code_to_emoji_flags = {value: key for key, value in emoji_flag_to_country_code.items()}
 environment = {'pw': ""}
 verified_servers = []
 
 def run():
     print("running client...")
-    token = os.getenv('TOKEN')
-    environment['pw'] = os.getenv('PASSWORD')
+    load_dotenv()
+    token = os.environ['TOKEN']
+    environment['pw'] = os.environ['PW']
     client.run(token)
 
 @client.event
@@ -48,15 +45,18 @@ async def on_message(message):
         return
     if message.content.startswith("$Login"):
         k = message.content.split("Login ", 1)[1]
+        print(k)
+        print(environment['pw'])
         if k == environment['pw']:
             server_id = message.guild.id
             verified_servers.append(server_id)
+            await message.channel.send(content="Successfully logged in.")
 
 @client.event
 async def on_reaction_add(reaction, user):
     server_id = reaction.message.guild.id
     if not server_id in verified_servers:
-        reaction.message.channel.send(content="Please log in.")
+        await reaction.message.channel.send(content="Please log in.")
         return
     if reaction.emoji in emoji_flag_to_country_code:
         target_lang = emoji_flag_to_country_code[reaction.emoji]
@@ -64,15 +64,17 @@ async def on_reaction_add(reaction, user):
         response = send_translation_request(message, target_lang)
         detected_language = response['detectedLanguage']['language']
         translation = response['translatedText']
-        embedding = create_embedding(message, translation, detected_language, user.name)
-        await reaction.message.channel.send(embed=embedding)
+        embedding, icon = create_embedding(message, translation, detected_language, user.name)
+        await reaction.message.channel.send(embed=embedding, file=icon)
 
 def create_embedding(original_msg, translation, detected_lang, user):
-    resp = Embed(title='Translation', description=translation, color=0x00ff00)
-    resp.add_field(name='original message', value=original_msg,inline=False)
-    resp.add_field(name='detected language', value=detected_lang.capitalize(), inline=False)
-    resp.add_field(name='requested by', value=user, inline=False)
-    return resp
+    resp = Embed(description=translation, color=0x00ff00)
+    resp.add_field(name='Original Message', value=original_msg,inline=False)
+    resp.add_field(name='Detected Language', value=detected_lang.upper() + country_code_to_emoji_flags[detected_lang], inline=False)
+    resp.add_field(name='Requested By', value=user, inline=False)
+    icon = discord.File("translate.jpeg", filename="translate.jpeg")
+    resp.set_author(name='Translation', icon_url="attachment://translate.jpeg")
+    return resp, icon
 def send_translation_request(message, target):
     url = api_url
     data = {
